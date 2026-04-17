@@ -1,0 +1,32 @@
+[
+  {
+    "name": "DiffSinger (openvpi)",
+    "version": "2.5.1",
+    "license": "MIT",
+    "text": "https://github.com/openvpi/DiffSinger/blob/main/LICENSE"
+  },
+  {
+    "name": "pyopenjtalk",
+    "version": "0.3.4",
+    "license": "MIT",
+    "text": "https://github.com/r9y9/pyopenjtalk/blob/master/LICENSE.md"
+  },
+  {
+    "name": "ONNX Runtime",
+    "version": "1.18",
+    "license": "MIT",
+    "text": "https://github.com/microsoft/onnxruntime/blob/main/LICENSE"
+  },
+  {
+    "name": "FastAPI",
+    "version": "0.115",
+    "license": "MIT",
+    "text": "https://github.com/tiangolo/fastapi/blob/master/LICENSE"
+  },
+  {
+    "name": "librosa",
+    "version": "0.10",
+    "license": "ISC",
+    "text": "https://github.com/librosa/librosa/blob/main/LICENSE.md"
+  }
+]

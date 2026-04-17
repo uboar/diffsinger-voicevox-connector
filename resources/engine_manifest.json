@@ -1,0 +1,29 @@
+{
+  "manifest_version": "0.13.1",
+  "name": "DiffSinger Connector",
+  "brand_name": "DiffSinger",
+  "uuid": "9e4cf7d0-7a6e-4e5c-9f1d-2b3a5d6e7f80",
+  "url": "https://github.com/uboar/diffsinger-voicevox-connector",
+  "version": "0.1.0",
+  "icon": "icon.png",
+  "default_sampling_rate": 24000,
+  "frame_rate": 93.75,
+  "terms_of_service": "terms.md",
+  "update_infos": "update_infos.json",
+  "dependency_licenses": "dependency_licenses.json",
+  "supported_vvlib_manifest_version": null,
+  "supported_features": {
+    "adjust_mora_pitch": { "type": "bool", "value": false, "name": "モーラ音高調整" },
+    "adjust_phoneme_length": { "type": "bool", "value": false, "name": "音素長調整" },
+    "adjust_speed_scale": { "type": "bool", "value": false, "name": "話速調整" },
+    "adjust_pitch_scale": { "type": "bool", "value": true, "name": "音高調整" },
+    "adjust_intonation_scale": { "type": "bool", "value": false, "name": "抑揚調整" },
+    "adjust_volume_scale": { "type": "bool", "value": true, "name": "音量調整" },
+    "adjust_pause_length": { "type": "bool", "value": false, "name": "無音長調整" },
+    "interrogative_upspeak": { "type": "bool", "value": false, "name": "疑問形イントネーション調整" },
+    "synthesis_morphing": { "type": "bool", "value": false, "name": "モーフィング" },
+    "sing": { "type": "bool", "value": true, "name": "歌唱合成" },
+    "manage_library": { "type": "bool", "value": false, "name": "ライブラリ管理" },
+    "return_resource_url": { "type": "bool", "value": false, "name": "リソースURL返送" }
+  }
+}

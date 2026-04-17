@@ -1,0 +1,9 @@
+[
+  {
+    "version": "0.1.0",
+    "descriptions": [
+      "初版リリース。openvpi/DiffSinger ONNX モデルに対応した VOICEVOX 互換歌唱合成エンジン。"
+    ],
+    "contributors": ["uboar"]
+  }
+]

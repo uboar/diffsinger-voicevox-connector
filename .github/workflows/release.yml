@@ -1,0 +1,85 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            os_label: windows
+            artifact_suffix: .exe
+          - os: macos-latest
+            os_label: macos
+            artifact_suffix: ""
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[build]
+          pip install Pillow
+
+      - name: Build standalone executable
+        run: python scripts/build_exe.py
+
+      - name: Build VVPP package
+        run: python scripts/build_vvpp.py --os ${{ matrix.os_label }}
+
+      - name: Upload executable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DiffSingerConnector-${{ matrix.os_label }}-exe
+          path: dist/DiffSingerConnector${{ matrix.artifact_suffix }}
+          if-no-files-found: error
+
+      - name: Upload VVPP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DiffSingerConnector-${{ matrix.os_label }}-vvpp
+          path: dist/DiffSingerConnector-*-${{ matrix.os_label }}.vvpp
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Flatten artifacts
+        run: |
+          mkdir -p release
+          find artifacts -type f \( -name "DiffSingerConnector*" -o -name "*.vvpp" \) -exec cp {} release/ \;
+          ls -la release
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true
