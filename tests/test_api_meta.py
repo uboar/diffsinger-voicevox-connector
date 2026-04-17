@@ -45,8 +45,9 @@ def test_engine_manifest_schema(client: TestClient) -> None:
     assert len(data["update_infos"]) >= 1
     assert isinstance(data["dependency_licenses"], list)
 
-    # supported_features の sing が True
-    assert data["supported_features"]["sing"]["value"] is True
+    # API では supported_features は bool に変換される
+    assert data["supported_features"]["sing"] is True
+    assert data["supported_features"]["apply_katakana_english"] is False
 
 
 def test_supported_devices(client: TestClient) -> None:

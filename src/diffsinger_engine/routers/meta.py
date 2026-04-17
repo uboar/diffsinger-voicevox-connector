@@ -87,13 +87,25 @@ def _build_manifest(resources_dir_str: str) -> EngineManifest:
 
     raw.setdefault("version", __version__)
 
-    # 型整合: ネストされた pydantic モデルへ詰め替え。
+    # 型整合: ファイル上は VVPP 用のメタ情報付き、API では bool のみに変換。
     raw["update_infos"] = [UpdateInfo(**u) for u in raw.get("update_infos", [])]
     raw["dependency_licenses"] = [
         DependencyLicense(**d) for d in raw.get("dependency_licenses", [])
     ]
-    raw["supported_features"] = EngineSupportedFeatures(**raw["supported_features"])
+    raw["supported_features"] = EngineSupportedFeatures(
+        **_supported_feature_values(raw["supported_features"])
+    )
     return EngineManifest(**raw)
+
+
+def _supported_feature_values(features: dict[str, Any]) -> dict[str, bool]:
+    values: dict[str, bool] = {}
+    for key, feature in features.items():
+        if isinstance(feature, dict):
+            values[key] = bool(feature.get("value", False))
+        else:
+            values[key] = bool(feature)
+    return values
 
 
 @router.get("/engine_manifest", response_model=EngineManifest)

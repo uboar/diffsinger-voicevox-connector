@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import json
 import platform
 import shutil
 import sys
@@ -23,6 +24,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 RESOURCES_DIR = REPO_ROOT / "resources"
 DIST_DIR = REPO_ROOT / "dist"
 APP_NAME = "DiffSingerConnector"
+DEFAULT_VVPP_PORT = 50122
 
 REQUIRED_RESOURCES = (
     "engine_manifest.json",
@@ -74,8 +76,8 @@ def _detect_os_label() -> str:
     return name or "unknown"
 
 
-def _exe_path() -> Path:
-    suffix = ".exe" if platform.system() == "Windows" else ""
+def _exe_path(os_label: str) -> Path:
+    suffix = ".exe" if os_label == "windows" else ""
     return DIST_DIR / f"{APP_NAME}{suffix}"
 
 
@@ -96,16 +98,76 @@ def _ensure_icon(target: Path) -> None:
     shutil.copy2(src_icon, target / "icon.png")
 
 
-def _stage_payload(stage: Path, exe: Path) -> None:
-    stage.mkdir(parents=True, exist_ok=True)
-
+def _copy_manifest_assets(target: Path) -> None:
+    target.mkdir(parents=True, exist_ok=True)
     for name in REQUIRED_RESOURCES:
+        if name == "engine_manifest.json":
+            continue
         src = RESOURCES_DIR / name
         if not src.exists():
             raise SystemExit(f"必須リソースが見つかりません: {src}")
-        shutil.copy2(src, stage / name)
+        shutil.copy2(src, target / name)
 
-    _ensure_icon(stage)
+    _ensure_icon(target)
+
+
+def _load_manifest_template() -> dict[str, object]:
+    manifest_path = RESOURCES_DIR / "engine_manifest.json"
+    if not manifest_path.exists():
+        raise SystemExit(f"必須リソースが見つかりません: {manifest_path}")
+    data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise SystemExit(f"engine_manifest.json の形式が不正です: {manifest_path}")
+    return data
+
+
+def _package_manifest(exe: Path, version: str) -> dict[str, object]:
+    manifest = _load_manifest_template()
+    manifest["command"] = exe.name
+    manifest["port"] = DEFAULT_VVPP_PORT
+    manifest["version"] = version
+    manifest.pop("supported_vvlib_manifest_version", None)
+    _validate_package_manifest(manifest)
+    return manifest
+
+
+def _validate_package_manifest(manifest: dict[str, object]) -> None:
+    required = {
+        "name": str,
+        "uuid": str,
+        "command": str,
+        "port": int,
+        "version": str,
+        "supported_features": dict,
+    }
+    for key, expected_type in required.items():
+        value = manifest.get(key)
+        if not isinstance(value, expected_type):
+            raise SystemExit(
+                "engine_manifest.json の VVPP 必須項目が不正です: "
+                f"{key}={value!r}"
+            )
+
+
+def _write_manifest(target: Path, manifest: dict[str, object]) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _stage_payload(stage: Path, exe: Path, version: str) -> None:
+    stage.mkdir(parents=True, exist_ok=True)
+
+    manifest = _package_manifest(exe, version)
+    _write_manifest(stage / "engine_manifest.json", manifest)
+    _copy_manifest_assets(stage)
+
+    # VOICEVOX はルートの manifest を読む。起動後のエンジンは cwd/resources を読む。
+    resources_stage = stage / "resources"
+    _write_manifest(resources_stage / "engine_manifest.json", manifest)
+    _copy_manifest_assets(resources_stage)
 
     shutil.copy2(exe, stage / exe.name)
 
@@ -145,7 +207,7 @@ def main() -> int:
     version = args.version or _detect_version()
     os_label = args.os_label or _detect_os_label()
 
-    exe = _exe_path()
+    exe = _exe_path(os_label)
     if not exe.exists():
         raise SystemExit(
             f"実行ファイルが見つかりません: {exe}\n"
@@ -157,7 +219,7 @@ def main() -> int:
 
     with tempfile.TemporaryDirectory(prefix="vvpp-stage-") as tmp:
         stage = Path(tmp) / "vvpp"
-        _stage_payload(stage, exe)
+        _stage_payload(stage, exe, version)
         _zip_stage(stage, output)
 
     print()

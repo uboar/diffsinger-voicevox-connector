@@ -27,7 +27,7 @@ from .settings import reload_settings
     default=None,
     help="frame_synthesis の既定出力サンプリングレート (既定: 44100)",
 )
-@click.option("--gpu", is_flag=True, default=False, help="CUDAExecutionProvider を試行")
+@click.option("--gpu", "--use_gpu", is_flag=True, default=False, help="CUDAExecutionProvider を試行")
 @click.option("--log-level", default=None, help="DEBUG/INFO/WARNING/ERROR")
 @click.version_option(__version__)
 def main(

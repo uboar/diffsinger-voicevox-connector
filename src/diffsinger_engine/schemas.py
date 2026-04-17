@@ -95,29 +95,24 @@ class SpeakerInfo(BaseModel):
 
 # ──────────────────────── EngineManifest ────────────────────────
 
-class EngineSupportedFeatureItem(BaseModel):
-    type: Literal["bool"] = "bool"
-    value: bool
-    name: str
-
-
 class EngineSupportedFeatures(BaseModel):
     """engine_manifest.supported_features。VOICEVOX エディタが機能可否を判定する。"""
 
     model_config = ConfigDict(populate_by_name=True)
 
-    adjust_mora_pitch: EngineSupportedFeatureItem
-    adjust_phoneme_length: EngineSupportedFeatureItem
-    adjust_speed_scale: EngineSupportedFeatureItem
-    adjust_pitch_scale: EngineSupportedFeatureItem
-    adjust_intonation_scale: EngineSupportedFeatureItem
-    adjust_volume_scale: EngineSupportedFeatureItem
-    adjust_pause_length: EngineSupportedFeatureItem
-    interrogative_upspeak: EngineSupportedFeatureItem
-    synthesis_morphing: EngineSupportedFeatureItem
-    sing: EngineSupportedFeatureItem
-    manage_library: EngineSupportedFeatureItem
-    return_resource_url: EngineSupportedFeatureItem
+    adjust_mora_pitch: bool
+    adjust_phoneme_length: bool
+    adjust_speed_scale: bool
+    adjust_pitch_scale: bool
+    adjust_intonation_scale: bool
+    adjust_volume_scale: bool
+    adjust_pause_length: bool | None = None
+    interrogative_upspeak: bool
+    synthesis_morphing: bool
+    sing: bool | None = None
+    manage_library: bool | None = None
+    return_resource_url: bool | None = None
+    apply_katakana_english: bool | None = None
 
 
 class UpdateInfo(BaseModel):

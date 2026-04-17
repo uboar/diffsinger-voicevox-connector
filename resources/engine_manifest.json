@@ -4,6 +4,8 @@
   "brand_name": "DiffSinger",
   "uuid": "9e4cf7d0-7a6e-4e5c-9f1d-2b3a5d6e7f80",
   "url": "https://github.com/uboar/diffsinger-voicevox-connector",
+  "command": "DiffSingerConnector",
+  "port": 50122,
   "version": "0.1.0",
   "icon": "icon.png",
   "default_sampling_rate": 24000,
@@ -11,7 +13,6 @@
   "terms_of_service": "terms.md",
   "update_infos": "update_infos.json",
   "dependency_licenses": "dependency_licenses.json",
-  "supported_vvlib_manifest_version": null,
   "supported_features": {
     "adjust_mora_pitch": { "type": "bool", "value": false, "name": "モーラ音高調整" },
     "adjust_phoneme_length": { "type": "bool", "value": false, "name": "音素長調整" },
@@ -24,6 +25,7 @@
     "synthesis_morphing": { "type": "bool", "value": false, "name": "モーフィング" },
     "sing": { "type": "bool", "value": true, "name": "歌唱合成" },
     "manage_library": { "type": "bool", "value": false, "name": "ライブラリ管理" },
-    "return_resource_url": { "type": "bool", "value": false, "name": "リソースURL返送" }
+    "return_resource_url": { "type": "bool", "value": false, "name": "リソースURL返送" },
+    "apply_katakana_english": { "type": "bool", "value": false, "name": "未知英単語のカタカナ変換" }
   }
 }
