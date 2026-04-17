@@ -26,6 +26,20 @@ ENTRYPOINT = SRC_DIR / "diffsinger_engine" / "__main__.py"
 APP_NAME = "DiffSingerConnector"
 
 
+def _configure_stdio() -> None:
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
+
+_configure_stdio()
+
+
 def _data_sep() -> str:
     """PyInstaller の --add-data 区切り文字 (Windows: ; / その他: :)."""
     return ";" if platform.system() == "Windows" else ":"
