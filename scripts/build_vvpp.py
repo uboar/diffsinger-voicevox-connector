@@ -4,7 +4,7 @@ dist/DiffSingerConnector(.exe) と resources/ をまとめ、最上位に
 engine_manifest.json を持つ zip を作成し拡張子 .vvpp で保存する。
 
 使い方:
-    python scripts/build_vvpp.py [--version X.Y.Z] [--os windows|macos]
+    python scripts/build_vvpp.py [--version X.Y.Z] [--os PLATFORM_LABEL]
 """
 
 from __future__ import annotations
@@ -67,17 +67,19 @@ def _detect_version() -> str:
 
 def _detect_os_label() -> str:
     name = platform.system().lower()
+    machine = platform.machine().lower()
     if name.startswith("win"):
         return "windows"
     if name == "darwin":
-        return "macos"
+        arch = "arm64" if machine in {"arm64", "aarch64"} else "x64"
+        return f"macos-{arch}"
     if name == "linux":
         return "linux"
     return name or "unknown"
 
 
 def _exe_path(os_label: str) -> Path:
-    suffix = ".exe" if os_label == "windows" else ""
+    suffix = ".exe" if os_label.startswith("windows") else ""
     return DIST_DIR / f"{APP_NAME}{suffix}"
 
 
@@ -200,7 +202,7 @@ def main() -> int:
         "--os",
         dest="os_label",
         default=None,
-        help="OS ラベル (既定: 実行中の OS から推定)",
+        help="配布ファイル名に使うプラットフォームラベル (既定: 実行中の OS から推定)",
     )
     args = parser.parse_args()
 

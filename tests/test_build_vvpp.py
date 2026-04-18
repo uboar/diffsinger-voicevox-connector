@@ -8,6 +8,17 @@ from pathlib import Path
 from scripts import build_vvpp
 
 
+def test_detect_os_label_includes_mac_arch(monkeypatch) -> None:
+    monkeypatch.setattr(build_vvpp.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(build_vvpp.platform, "machine", lambda: "arm64")
+
+    assert build_vvpp._detect_os_label() == "macos-arm64"
+
+
+def test_exe_path_accepts_arch_specific_windows_label() -> None:
+    assert build_vvpp._exe_path("windows-x64").name == "DiffSingerConnector.exe"
+
+
 def test_stage_payload_writes_voicevox_installable_manifest(tmp_path: Path) -> None:
     exe = tmp_path / "DiffSingerConnector.exe"
     exe.write_bytes(b"dummy executable")

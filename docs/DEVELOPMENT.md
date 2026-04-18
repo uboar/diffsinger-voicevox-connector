@@ -93,7 +93,66 @@ python scripts/build_exe.py     # PyInstaller で実行ファイルを作成
 python scripts/build_vvpp.py    # 上記成果物を含む .vvpp パッケージを作成
 ```
 
-成果物は `dist/` 配下に生成されます。
+成果物は `dist/` 配下に生成されます。macOS ではビルドした CPU に応じて
+`DiffSingerConnector-<version>-macos-arm64.vvpp` または
+`DiffSingerConnector-<version>-macos-x64.vvpp` が生成されます。
+
+### macOS でローカルビルドする手順
+
+Apple Silicon / Intel のどちらでも、その Mac 自身でビルドした成果物を配布用に使う想定です。
+まず自分の CPU 種別を確認します。
+
+```bash
+uname -m
+# arm64   -> Apple Silicon 用の成果物が生成される
+# x86_64  -> Intel Mac 用の成果物が生成される
+```
+
+初回のみ、必要であれば Xcode Command Line Tools を入れてください。
+
+```bash
+xcode-select --install
+```
+
+その後、仮想環境を作って依存関係を入れます。
+
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -e .[dev,build]
+pip install Pillow
+```
+
+ビルドは次の 2 コマンドです。
+
+```bash
+python scripts/build_exe.py --clean
+python scripts/build_vvpp.py
+```
+
+生成物は `dist/` に出ます。
+
+```bash
+ls -lh dist/
+# Apple Silicon なら DiffSingerConnector-<version>-macos-arm64.vvpp
+# Intel Mac なら   DiffSingerConnector-<version>-macos-x64.vvpp
+```
+
+必要なら、配布前に単体起動で疎通確認できます。
+
+```bash
+dist/DiffSingerConnector --port 50122
+# 別ターミナルで
+curl http://127.0.0.1:50122/version
+```
+
+補足:
+
+- `macos-arm64` の VVPP は Apple Silicon Mac 上でビルド
+- `macos-x64` の VVPP は Intel Mac 上でビルド
+- universal2 にはしていないため、1 台で両方を同時生成する前提ではありません
+- コード署名は未対応なので、macOS 側で初回起動時に Gatekeeper の確認が出ることがあります
 
 ---
 

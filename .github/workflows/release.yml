@@ -24,11 +24,17 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            os_label: windows
+            target_label: windows
             artifact_suffix: .exe
+            upload_executable_name: DiffSingerConnector-windows.exe
           - os: macos-latest
-            os_label: macos
+            target_label: macos-arm64
             artifact_suffix: ""
+            upload_executable_name: DiffSingerConnector-macos-arm64
+          - os: macos-15-intel
+            target_label: macos-x64
+            artifact_suffix: ""
+            upload_executable_name: DiffSingerConnector-macos-x64
 
     steps:
       - name: Checkout
@@ -50,20 +56,20 @@ jobs:
         run: python scripts/build_exe.py
 
       - name: Build VVPP package
-        run: python scripts/build_vvpp.py --os ${{ matrix.os_label }}
+        run: python scripts/build_vvpp.py --os ${{ matrix.target_label }}
 
-      - name: Upload executable artifact
+      - name: Prepare release artifacts
+        shell: bash
+        run: |
+          mkdir -p release
+          cp "dist/DiffSingerConnector${{ matrix.artifact_suffix }}" "release/${{ matrix.upload_executable_name }}"
+          cp dist/DiffSingerConnector-*-${{ matrix.target_label }}.vvpp release/
+
+      - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: DiffSingerConnector-${{ matrix.os_label }}-exe
-          path: dist/DiffSingerConnector${{ matrix.artifact_suffix }}
-          if-no-files-found: error
-
-      - name: Upload VVPP artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: DiffSingerConnector-${{ matrix.os_label }}-vvpp
-          path: dist/DiffSingerConnector-*-${{ matrix.os_label }}.vvpp
+          name: DiffSingerConnector-${{ matrix.target_label }}-release
+          path: release/*
           if-no-files-found: error
 
   release:

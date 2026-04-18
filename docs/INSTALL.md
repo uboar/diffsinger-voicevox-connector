@@ -28,7 +28,10 @@
 本コネクターの配布ファイルを入手します。
 
 1. GitHub のリリースページを開きます（このリポジトリの「Releases」タブ）。
-2. 一番新しいリリースの「Assets（添付ファイル）」のなかから **`DiffSingerConnector.vvpp`** をクリックしてダウンロードします。
+2. 一番新しいリリースの「Assets（添付ファイル）」のなかから、自分の環境に合う `.vvpp` をダウンロードします。
+   Windows: **`DiffSingerConnector-<version>-windows.vvpp`**
+   Apple Silicon Mac: **`DiffSingerConnector-<version>-macos-arm64.vvpp`**
+   Intel Mac: **`DiffSingerConnector-<version>-macos-x64.vvpp`**
 3. ダウンロード先（通常は「ダウンロード」フォルダ）にファイルが保存されたことを確認します。
 
 ![GitHub Releases で .vvpp をダウンロードする様子](images/install_step2.png)
@@ -39,7 +42,7 @@
 
 ## 3. ダブルクリックで VOICEVOX に追加する
 
-ダウンロードした `DiffSingerConnector.vvpp` をダブルクリックしてください。
+ダウンロードした `.vvpp` をダブルクリックしてください。
 
 1. 自動的に VOICEVOX エディタが起動します。
 2. 「エンジンを追加しますか？」というダイアログが表示されます。
@@ -86,7 +89,9 @@
 基本的な流れは Windows と同じです。
 
 1. VOICEVOX 公式サイトから macOS 版インストーラー（`.dmg`）をダウンロードして開き、アプリを「アプリケーション」フォルダにドラッグします。
-2. GitHub Releases から **`DiffSingerConnector.vvpp`** をダウンロードします。
+2. GitHub Releases から、お使いの Mac に合う `.vvpp` をダウンロードします。
+   Apple Silicon (M1/M2/M3 など): **`DiffSingerConnector-<version>-macos-arm64.vvpp`**
+   Intel Mac: **`DiffSingerConnector-<version>-macos-x64.vvpp`**
 3. Finder でダウンロードした `.vvpp` をダブルクリック → VOICEVOX が起動して「エンジンを追加しますか？」と聞かれるので「はい」を選びます。
 4. 「開発元が未確認です」と出た場合は、Finder で `.vvpp` を右クリック →「開く」を選び、もう一度「開く」を押すと進めます。
 5. あとは Windows 手順の 4 番以降と同じです。
