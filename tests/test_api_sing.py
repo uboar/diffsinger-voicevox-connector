@@ -88,6 +88,19 @@ def test_singer_info_url_format_rejected(client: TestClient) -> None:
     assert res.status_code == 400
 
 
+def test_singer_info_returns_fallback_images_when_assets_missing(client: TestClient) -> None:
+    res = client.get(
+        "/singer_info",
+        params={"speaker_uuid": "00000000-0000-0000-0000-000000000001"},
+    )
+    assert res.status_code == 200, res.text
+
+    data = res.json()
+    assert data["portrait"].startswith("iVBOR")
+    assert data["style_infos"][0]["icon"].startswith("iVBOR")
+    assert data["style_infos"][0]["portrait"].startswith("iVBOR")
+
+
 def test_sing_frame_audio_query(client: TestClient) -> None:
     # 簡易 Score: 無音 → 「あ」(D4=62) → 無音
     score = {

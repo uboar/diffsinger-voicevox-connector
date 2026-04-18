@@ -16,6 +16,9 @@ from ..schemas import Speaker, SpeakerInfo, SpeakerStyle, StyleInfo, StyleType
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["singers"])
+_TRANSPARENT_PNG_BASE64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+yF9sAAAAASUVORK5CYII="
+)
 
 
 def _singer_to_speaker(singer) -> Speaker:  # type: ignore[no-untyped-def]
@@ -30,10 +33,10 @@ def _singer_to_speaker(singer) -> Speaker:  # type: ignore[no-untyped-def]
 
 
 def _read_image_base64(path: Path | None, fallback: Path | None) -> str:
-    """image を base64 で読み込む。primary が無ければ fallback を試す。失敗時は空文字。"""
+    """image を base64 で読み込む。見つからない場合も有効な PNG を返す。"""
     target = path if (path is not None and path.is_file()) else fallback
     if target is None or not target.is_file():
-        return ""
+        return _TRANSPARENT_PNG_BASE64
     return base64.b64encode(target.read_bytes()).decode("ascii")
 
 
@@ -63,12 +66,25 @@ def get_singer_info(
     singer = find_singer_by_uuid(request, speaker_uuid)
 
     settings = request.app.state.settings
-    defaults_dir = Path(settings.resources_dir) / "default_singer_assets"
-    fallback_icon = defaults_dir / "icon.png"
-    fallback_portrait = defaults_dir / "portrait.png"
+    resources_dir = Path(settings.resources_dir)
+    defaults_dir = resources_dir / "default_singer_assets"
+    engine_icon = resources_dir / "icon.png"
+    fallback_icon = (
+        defaults_dir / "icon.png"
+        if (defaults_dir / "icon.png").is_file()
+        else engine_icon
+    )
+    fallback_portrait = (
+        defaults_dir / "portrait.png"
+        if (defaults_dir / "portrait.png").is_file()
+        else fallback_icon
+    )
 
     icon_b64 = _read_image_base64(singer.icon_path, fallback_icon)
-    portrait_b64 = _read_image_base64(singer.portrait_path, fallback_portrait)
+    portrait_b64 = _read_image_base64(
+        singer.portrait_path,
+        singer.icon_path if singer.icon_path is not None else fallback_portrait,
+    )
 
     policy = singer.character.get("policy") or singer.character.get("description") or (
         "本歌手モデルの利用規約は配布元の指示に従ってください。"
