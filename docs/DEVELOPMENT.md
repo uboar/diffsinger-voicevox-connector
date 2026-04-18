@@ -27,7 +27,7 @@ pip install -e .[dev]
 ## ローカル起動
 
 ```bash
-python -m diffsinger_engine --port 50122 --models ./models
+PYTHONPATH=src .venv/bin/python -m diffsinger_engine --port 50122 --models ./models
 ```
 
 起動後、以下で動作確認できます。
@@ -37,6 +37,15 @@ curl http://127.0.0.1:50122/version
 curl http://127.0.0.1:50122/engine_manifest
 curl http://127.0.0.1:50122/singers
 ```
+
+または、起動から疎通確認までまとめて行うスモークテストを使えます。
+
+```bash
+.venv/bin/python scripts/smoke_test_local.py
+```
+
+`.venv` がある場合は `scripts/start.command` / `scripts/start.bat` もその仮想環境を優先し、
+ソースツリー実行時は自動で `src/` を `PYTHONPATH` に追加します。
 
 VOICEVOX エディタの「設定」→「エンジン」→「ホストを追加」で `http://127.0.0.1:50122` を登録すると、ビルド済み `.vvpp` を使わずにエディタから接続できます。
 
