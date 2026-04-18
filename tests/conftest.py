@@ -23,6 +23,7 @@ def settings(tmp_models_dir: Path, tmp_path: Path) -> Settings:
         port=0,
         models_dir=tmp_models_dir,
         resources_dir=Path(__file__).parent.parent / "resources",
+        vocoder_cache_dir=tmp_path / "vocoder-cache",
         logs_dir=tmp_path / "logs",
         final_sampling_rate=44100,
         editor_default_sampling_rate=24000,

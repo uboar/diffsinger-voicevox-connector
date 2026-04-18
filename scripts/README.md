@@ -8,6 +8,7 @@
 |----------|------|------|
 | `build_exe.py` | PyInstaller でスタンドアロン実行ファイル生成 | 開発者 / CI |
 | `build_vvpp.py` | VVPP (VOICEVOX エンジンプラグイン) を生成 | 開発者 / CI |
+| `smoke_test_local.py` | ローカル起動確認。必要なら共有 vocoder を配置して実歌唱まで検証 | 開発者 |
 | `start.bat` | Windows でダブルクリック起動 | エンドユーザー |
 | `start.command` | macOS でダブルクリック起動 | エンドユーザー |
 
@@ -74,6 +75,18 @@ dist/DiffSingerConnector --port 50122
 curl http://127.0.0.1:50122/version
 curl http://127.0.0.1:50122/engine_manifest
 ```
+
+ソースツリー実行時はスモークテストを使うと、起動確認から実歌唱まで一括で検証できます。
+
+```bash
+# メタ API だけ確認
+.venv/bin/python scripts/smoke_test_local.py
+
+# OpenUtau 共有 vocoder を自動配置し、WAV 生成まで確認
+.venv/bin/python scripts/smoke_test_local.py --download-openutau-vocoder --synthesize
+```
+
+`--synthesize` 成功時は `logs/smoke_test_song.wav` が生成されます。
 
 ## CI
 

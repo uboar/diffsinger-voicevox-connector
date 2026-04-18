@@ -35,11 +35,11 @@ _MODEL_LOAD_FAIL_MSG = (
 )
 
 
-def get_singers(request: Request) -> list["LoadedSinger"]:
+def get_singers(request: Request) -> list[LoadedSinger]:
     return list(getattr(request.app.state, "singers", []) or [])
 
 
-def get_singer(request: Request, style_id: int) -> "LoadedSinger":
+def get_singer(request: Request, style_id: int) -> LoadedSinger:
     """style_id から LoadedSinger を解決。見つからなければ 404。"""
     for singer in get_singers(request):
         if singer.style_id == style_id:
@@ -50,7 +50,7 @@ def get_singer(request: Request, style_id: int) -> "LoadedSinger":
     )
 
 
-def find_singer_by_uuid(request: Request, speaker_uuid: str) -> "LoadedSinger":
+def find_singer_by_uuid(request: Request, speaker_uuid: str) -> LoadedSinger:
     for singer in get_singers(request):
         if singer.uuid == speaker_uuid:
             return singer
@@ -64,8 +64,8 @@ def find_singer_by_uuid(request: Request, speaker_uuid: str) -> "LoadedSinger":
 
 
 def get_or_load_models(
-    app: "FastAPI", singer: "LoadedSinger"
-) -> tuple["AcousticModel", "Vocoder"]:
+    app: FastAPI, singer: LoadedSinger
+) -> tuple[AcousticModel, Vocoder]:
     """app.state にキャッシュした acoustic / vocoder を返す。初回はロード試行。
 
     ロード失敗時は 500 を投げる (詳細メッセージは日本語)。
@@ -92,7 +92,15 @@ def get_or_load_models(
             dsconfig=singer.dsconfig,
             providers=providers,
         )
-        vocoder = Vocoder(singer.vocoder_path, providers=providers)
+        vocoder = Vocoder(
+            singer.vocoder_path,
+            providers=providers,
+            sample_rate=int(
+                singer.vocoder_config.get("sample_rate")
+                or singer.dsconfig.get("sample_rate")
+                or 44100
+            ),
+        )
     except Exception as exc:
         logger.exception("モデルロード失敗 (style_id=%s)", singer.style_id)
         raise HTTPException(

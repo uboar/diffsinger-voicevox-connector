@@ -66,6 +66,13 @@ class Vocoder:
 
     def run(self, mel: np.ndarray, f0: np.ndarray) -> np.ndarray:
         """mel + f0 → 波形 (44.1kHz mono float32)。"""
+        mel = np.asarray(mel, dtype=np.float32)
+        f0 = np.asarray(f0, dtype=np.float32)
+        if mel.ndim == 2:
+            mel = mel[None, :, :]
+        if f0.ndim == 1:
+            f0 = f0[None, :]
+
         feed: dict[str, np.ndarray] = {}
         # NSF-HiFiGAN の典型的な入力名: "mel" / "f0"。順不同で詰める。
         for name in self.input_names:

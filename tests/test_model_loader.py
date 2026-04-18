@@ -17,11 +17,14 @@ def _make_singer_dir(
     *,
     with_character: bool = False,
     missing: tuple[str, ...] = (),
+    vocoder: str = "vocoder.onnx",
 ) -> Path:
     folder = base / name
     folder.mkdir()
     files = {
-        "dsconfig.yaml": "phonemes: phonemes.txt\nacoustic: acoustic.onnx\nhop_size: 512\n",
+        (
+            "dsconfig.yaml"
+        ): f"phonemes: phonemes.txt\nacoustic: acoustic.onnx\nhop_size: 512\nvocoder: {vocoder}\n",
         "acoustic.onnx": "",
         "vocoder.onnx": "",
         "phonemes.txt": "a\ni\nu\ne\no\nrest\n",
@@ -110,3 +113,46 @@ def test_icon_and_portrait_optional(tmp_path: Path) -> None:
     assert singer.icon_path is not None
     assert singer.icon_path.name == "icon.png"
     assert singer.portrait_path is None
+
+
+def test_load_singers_resolves_shared_vocoder_dir(tmp_path: Path) -> None:
+    _make_singer_dir(tmp_path, "alpha", missing=("vocoder.onnx",), vocoder="nsf_hifigan")
+    shared = tmp_path / "vocoders"
+    shared.mkdir()
+    (shared / "nsf_hifigan.onnx").write_bytes(b"fake")
+    (shared / "vocoder.yaml").write_text(
+        "sample_rate: 44100\nhop_size: 512\n",
+        encoding="utf-8",
+    )
+
+    [singer] = model_loader.load_singers(tmp_path)
+    assert singer.vocoder_path == shared / "nsf_hifigan.onnx"
+    assert singer.vocoder_config["sample_rate"] == 44100
+
+
+def test_load_singers_extracts_vocoder_from_oudep(tmp_path: Path) -> None:
+    import zipfile
+
+    _make_singer_dir(tmp_path, "alpha", missing=("vocoder.onnx",), vocoder="nsf_hifigan")
+    shared = tmp_path / "vocoders"
+    shared.mkdir()
+
+    archive_path = shared / "nsf_hifigan.oudep"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr("vocoder.yaml", "model: nsf_hifigan.onnx\nsample_rate: 44100\n")
+        archive.writestr("nsf_hifigan.onnx", b"fake-onnx")
+
+    singers = model_loader.load_singers(tmp_path)
+    [singer] = singers
+    assert singer.vocoder_path.is_file()
+    assert singer.vocoder_path.name == "nsf_hifigan.onnx"
+    assert singer.vocoder_config["sample_rate"] == 44100
+
+
+def test_load_singers_ignores_shared_directories(tmp_path: Path) -> None:
+    _make_singer_dir(tmp_path, "alpha")
+    (tmp_path / "vocoders").mkdir()
+    (tmp_path / ".cache").mkdir()
+
+    singers = model_loader.load_singers(tmp_path)
+    assert [s.folder.name for s in singers] == ["alpha"]

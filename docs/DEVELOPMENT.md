@@ -44,10 +44,29 @@ curl http://127.0.0.1:50122/singers
 .venv/bin/python scripts/smoke_test_local.py
 ```
 
+実モデルで実際に歌わせる確認まで行う場合は、共有 vocoder (`nsf_hifigan`) を自動配置しつつ
+WAV 生成まで確認できます。
+
+```bash
+.venv/bin/python scripts/smoke_test_local.py --download-openutau-vocoder --synthesize
+```
+
+成功すると `logs/smoke_test_song.wav` が生成されます。OpenUtau 形式モデルで
+`vocoder: nsf_hifigan` のような共有 vocoder 参照を使っている場合は、
+`models/vocoders/` に `.onnx` または `.oudep` を置くと自動解決されます。
+
 `.venv` がある場合は `scripts/start.command` / `scripts/start.bat` もその仮想環境を優先し、
 ソースツリー実行時は自動で `src/` を `PYTHONPATH` に追加します。
 
 VOICEVOX エディタの「設定」→「エンジン」→「ホストを追加」で `http://127.0.0.1:50122` を登録すると、ビルド済み `.vvpp` を使わずにエディタから接続できます。
+
+### 開発時のおすすめ手順
+
+1. `.venv/bin/python scripts/smoke_test_local.py --download-openutau-vocoder --synthesize`
+2. `pytest tests/`
+3. `PYTHONPATH=src .venv/bin/python -m diffsinger_engine --port 50122 --models ./models`
+4. VOICEVOX エディタの「設定」→「エンジン」→「ホストを追加」で `http://127.0.0.1:50122` を登録
+5. VOICEVOX のソング画面で DiffSinger 歌手を選び、実際に再生確認
 
 ---
 

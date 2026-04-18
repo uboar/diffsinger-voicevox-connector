@@ -29,7 +29,10 @@ async def _lifespan(app: FastAPI):
     try:
         from .model_loader import load_singers
 
-        singers = load_singers(settings.models_dir)
+        singers = load_singers(
+            settings.models_dir,
+            vocoder_cache_dir=settings.vocoder_cache_dir,
+        )
         app.state.singers = singers
         logger.info("DiffSinger 歌手モデルを %d 件読み込みました", len(singers))
         if not singers:

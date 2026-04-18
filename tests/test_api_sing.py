@@ -27,9 +27,11 @@ def _make_dummy_singer(folder: Path, style_id: int = 0) -> LoadedSinger:
         acoustic_path=folder / "acoustic.onnx",
         vocoder_path=folder / "vocoder.onnx",
         phonemes_path=folder / "phonemes.txt",
+        phoneme_to_id={"SP": 0, "a": 1, "rest": 0},
         icon_path=None,
         portrait_path=None,
         character={},
+        vocoder_config={"sample_rate": 44100, "hop_size": 512},
     )
 
 

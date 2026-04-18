@@ -51,6 +51,8 @@ DiffSinger モデルの多くは、姉妹プロジェクトである **OpenUtau*
 | `phonemes.txt` | このモデルが扱える音素（音の最小単位）の一覧（必須） |
 
 > ※ `vocoder.onnx` は別のフォルダから読み込まれる構成もあります。配布元の説明に従ってください。
+> OpenUtau 形式で `vocoder: nsf_hifigan` のような指定になっている場合は、
+> `models/vocoders/` に `nsf_hifigan.onnx` または `nsf_hifigan.oudep` を置くと本コネクターが自動で解決します。
 
 このほかに、以下のファイルが含まれていることがあります（任意）。
 

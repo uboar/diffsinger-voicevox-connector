@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 
 import numpy as np
-from fastapi import APIRouter, Body, Query, Request, Response
+from fastapi import APIRouter, Body, HTTPException, Query, Request, Response, status
 
 from ..inference.frame_query import VOICEVOX_FRAME_RATE, build_frame_query
 from ..inference.postprocess import to_wav_bytes
@@ -16,6 +16,19 @@ from ..schemas import FrameAudioQuery, Score
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["sing"])
+_FRAME_AUDIO_QUERY_BODY = Body(...)
+_PHONEME_ALIAS_TO_MODEL: dict[str, str] = {
+    "rest": "SP",
+    "pau": "SP",
+    "sil": "SP",
+    "sp": "SP",
+    "ap": "AP",
+}
+_SCORE_BODY = Body(...)
+_SCORE_AND_QUERY_BODY = Body(
+    ...,
+    description="{score: Score, frame_audio_query: FrameAudioQuery}",
+)
 
 
 def _build_query_for_singer(request: Request, score: Score) -> FrameAudioQuery:
@@ -33,7 +46,7 @@ def _build_query_for_singer(request: Request, score: Score) -> FrameAudioQuery:
 @router.post("/sing_frame_audio_query", response_model=FrameAudioQuery)
 def sing_frame_audio_query(
     request: Request,
-    score: Score = Body(...),
+    score: Score = _SCORE_BODY,
     speaker: int = Query(..., description="GET /singers の style id"),
 ) -> FrameAudioQuery:
     get_singer(request, speaker)  # 存在検証
@@ -49,7 +62,7 @@ class _ScoreAndQuery(dict):
 @router.post("/sing_frame_f0", response_model=list[float])
 def sing_frame_f0(
     request: Request,
-    payload: dict = Body(..., description="{score: Score, frame_audio_query: FrameAudioQuery}"),
+    payload: dict = _SCORE_AND_QUERY_BODY,
     speaker: int = Query(...),
 ) -> list[float]:
     get_singer(request, speaker)
@@ -62,7 +75,7 @@ def sing_frame_f0(
 @router.post("/sing_frame_volume", response_model=list[float])
 def sing_frame_volume(
     request: Request,
-    payload: dict = Body(..., description="{score: Score, frame_audio_query: FrameAudioQuery}"),
+    payload: dict = _SCORE_AND_QUERY_BODY,
     speaker: int = Query(...),
 ) -> list[float]:
     get_singer(request, speaker)
@@ -79,29 +92,36 @@ def sing_frame_volume(
 )
 def frame_synthesis(
     request: Request,
-    query: FrameAudioQuery = Body(...),
+    query: FrameAudioQuery = _FRAME_AUDIO_QUERY_BODY,
     speaker: int = Query(...),
 ) -> Response:
     singer = get_singer(request, speaker)
     acoustic, vocoder = get_or_load_models(request.app, singer)
 
-    # FrameAudioQuery → acoustic 入力。実モデルが要求する具体的な
-    # テンソル名は dsconfig 依存のため、ここでは最小セットを渡す。
-    f0 = np.asarray(query.f0, dtype=np.float32)
-    volume = np.asarray(query.volume, dtype=np.float32)
+    # VOICEVOX の 93.75fps 表現を、モデル native の hop_size/sample_rate に合わせて変換する。
+    durations_list = _query_durations_to_model_frames(query, singer)
+    total_frames = sum(durations_list)
+    if total_frames <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="frame_synthesis に必要なフレーム列が空です。",
+        )
+
+    f0 = np.asarray(_resample_to_length(query.f0, total_frames), dtype=np.float32)
+    volume = np.asarray(_resample_to_length(query.volume, total_frames), dtype=np.float32)
     tokens = np.asarray(
-        [_phoneme_to_token_id(p.phoneme) for p in query.phonemes],
+        [_phoneme_to_token_id(singer.phoneme_to_id, p.phoneme) for p in query.phonemes],
         dtype=np.int64,
     )[None, :]
-    durations = np.asarray(
-        [p.frame_length for p in query.phonemes], dtype=np.int64
-    )[None, :]
+    durations = np.asarray(durations_list, dtype=np.int64)[None, :]
 
     features = {
         "tokens": tokens,
         "durations": durations,
         "f0": f0[None, :],
         "volume": volume[None, :],
+        "depth": np.asarray(int(singer.dsconfig.get("max_depth") or 400), dtype=np.int64),
+        "speedup": np.asarray(max(int(singer.dsconfig.get("speedup") or 1), 1), dtype=np.int64),
     }
 
     mel = acoustic.run(features)
@@ -115,6 +135,68 @@ def frame_synthesis(
     return Response(content=wav_bytes, media_type="audio/wav")
 
 
-def _phoneme_to_token_id(phoneme: str) -> int:
-    """phoneme 文字列を簡易的に整数 ID に変換 (実モデル使用時はモデル付属辞書で再マップ)。"""
-    return abs(hash(phoneme)) % 10000
+def _query_durations_to_model_frames(query: FrameAudioQuery, singer) -> list[int]:  # type: ignore[no-untyped-def]
+    model_frame_rate = _model_frame_rate(singer)
+    durations: list[int] = []
+    for phoneme in query.phonemes:
+        model_frames = int(round((phoneme.frame_length / VOICEVOX_FRAME_RATE) * model_frame_rate))
+        if phoneme.frame_length > 0 and model_frames <= 0:
+            model_frames = 1
+        durations.append(model_frames)
+    return durations
+
+
+def _model_frame_rate(singer) -> float:  # type: ignore[no-untyped-def]
+    sample_rate = float(
+        singer.dsconfig.get("sample_rate")
+        or singer.vocoder_config.get("sample_rate")
+        or 44100
+    )
+    hop_size = float(
+        singer.dsconfig.get("hop_size")
+        or singer.vocoder_config.get("hop_size")
+        or 512
+    )
+    if hop_size <= 0:
+        return VOICEVOX_FRAME_RATE
+    return sample_rate / hop_size
+
+
+def _resample_to_length(values: list[float], target_length: int) -> list[float]:
+    if target_length <= 0:
+        return []
+    if not values:
+        return [0.0] * target_length
+    if len(values) == target_length:
+        return list(values)
+    if len(values) == 1:
+        return [float(values[0])] * target_length
+
+    source = np.asarray(values, dtype=np.float32)
+    positions = np.linspace(0, len(source) - 1, num=target_length)
+    indices = np.clip(np.rint(positions).astype(np.int64), 0, len(source) - 1)
+    return source[indices].astype(np.float32).tolist()
+
+
+def _phoneme_to_token_id(phoneme_to_id: dict[str, int], phoneme: str) -> int:
+    candidates = [
+        phoneme,
+        _PHONEME_ALIAS_TO_MODEL.get(phoneme, phoneme),
+        phoneme.lower(),
+        phoneme.upper(),
+    ]
+    for candidate in candidates:
+        if candidate in phoneme_to_id:
+            return phoneme_to_id[candidate]
+
+    if "SP" in phoneme_to_id:
+        logger.warning("未登録音素 %r を SP にフォールバックします", phoneme)
+        return phoneme_to_id["SP"]
+    if "<PAD>" in phoneme_to_id:
+        logger.warning("未登録音素 %r を <PAD> にフォールバックします", phoneme)
+        return phoneme_to_id["<PAD>"]
+
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=f"音素 {phoneme!r} をモデル語彙へ変換できませんでした。",
+    )

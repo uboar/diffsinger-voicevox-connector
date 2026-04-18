@@ -29,6 +29,12 @@ class Settings(BaseSettings):
         default=Path("./resources"),
         description="エンジンマニフェスト等のリソース配置ディレクトリ",
     )
+    vocoder_cache_dir: Path = Field(
+        default=Path("./models/.cache/vocoders"),
+        description=(
+            "OpenUtau .oudep などの共有 vocoder を展開して再利用するキャッシュディレクトリ"
+        ),
+    )
     logs_dir: Path = Field(
         default=Path("./logs"),
         description="ログファイル出力ディレクトリ",
