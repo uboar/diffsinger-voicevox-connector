@@ -7,8 +7,8 @@ from pathlib import Path
 import click
 import uvicorn
 
-from . import __version__
-from .settings import reload_settings
+from diffsinger_engine import __version__
+from diffsinger_engine.settings import reload_settings
 
 
 @click.command(help="DiffSinger × VOICEVOX Connector を起動します")
@@ -55,7 +55,7 @@ def main(
     settings = reload_settings(**overrides)
 
     # app は遅延 import (CLI ヘルプを軽くするため)
-    from .app import create_app
+    from diffsinger_engine.app import create_app
 
     app = create_app(settings)
 
