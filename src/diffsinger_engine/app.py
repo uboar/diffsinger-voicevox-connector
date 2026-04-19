@@ -34,6 +34,8 @@ async def _lifespan(app: FastAPI):
             vocoder_cache_dir=settings.vocoder_cache_dir,
         )
         app.state.singers = singers
+        app.state.user_dict_store = {}
+        app.state.initialized_speaker_ids = set()
         logger.info("DiffSinger 歌手モデルを %d 件読み込みました", len(singers))
         if not singers:
             logger.warning(
@@ -43,6 +45,8 @@ async def _lifespan(app: FastAPI):
     except ImportError:
         logger.warning("model_loader が未実装のため、歌手リストは空で起動します")
         app.state.singers = []
+        app.state.user_dict_store = {}
+        app.state.initialized_speaker_ids = set()
 
     yield
     logger.info("DiffSinger Connector を停止しました")
@@ -74,11 +78,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # ルーター登録 (実体はタスク #3)。未実装でも起動だけはできるようにする。
     try:
-        from .routers import meta, sing, singers, tts_stub
+        from .routers import compat, meta, sing, singers, tts_stub
 
         app.include_router(meta.router)
         app.include_router(singers.router)
         app.include_router(sing.router)
+        app.include_router(compat.router)
         app.include_router(tts_stub.router)
     except ImportError as e:
         logger.warning("ルーター未実装のためスキップ: %s", e)
