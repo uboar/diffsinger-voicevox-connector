@@ -133,11 +133,12 @@ def is_initialized_speaker(
     request: Request,
     speaker: int = Query(...),
 ) -> bool:
+    singer = get_singer(request, speaker)
     acoustic_cache = getattr(request.app.state, "acoustic_cache", {})
     vocoder_cache = getattr(request.app.state, "vocoder_cache", {})
-    if speaker in acoustic_cache and speaker in vocoder_cache:
+    if singer.style_id in acoustic_cache and singer.style_id in vocoder_cache:
         return True
-    return speaker in _initialized_speaker_ids(request)
+    return singer.style_id in _initialized_speaker_ids(request)
 
 
 @router.post("/initialize_speaker", status_code=status.HTTP_204_NO_CONTENT)
@@ -147,10 +148,10 @@ def initialize_speaker(
     skip_reinit: bool = Query(default=False),
 ) -> Response:
     initialized = _initialized_speaker_ids(request)
-    if skip_reinit and speaker in initialized:
+    singer = get_singer(request, speaker)
+    if skip_reinit and singer.style_id in initialized:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-    singer = get_singer(request, speaker)
     get_or_load_models(request.app, singer)
-    initialized.add(speaker)
+    initialized.add(singer.style_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

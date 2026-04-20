@@ -124,6 +124,46 @@ def test_sing_frame_audio_query(client: TestClient) -> None:
     assert len(q["volume"]) == total
 
 
+def test_sing_frame_audio_query_uses_pitch_predictor(monkeypatch, client: TestClient) -> None:
+    from diffsinger_engine.routers import sing as sing_router
+
+    class _FakePitchPredictor:
+        def predict_f0(self, score, ds_input):  # type: ignore[no-untyped-def]
+            assert score.notes[0].key == 60
+            assert ds_input.ph_seq == ["a"]
+            return [220.0, 330.0, 440.0]
+
+    monkeypatch.setattr(
+        sing_router,
+        "get_or_load_pitch_predictor",
+        lambda _app, _singer: _FakePitchPredictor(),
+    )
+
+    score = {"notes": [{"key": 60, "frame_length": 24, "lyric": "あ"}]}
+    res = client.post("/sing_frame_audio_query", params={"speaker": 0}, json=score)
+
+    assert res.status_code == 200, res.text
+    f0 = res.json()["f0"]
+    assert len(f0) == res.json()["phonemes"][0]["frame_length"]
+    assert len({round(value, 3) for value in f0}) > 1
+
+
+def test_sing_frame_audio_query_uses_voicevox_pause_phoneme(client: TestClient) -> None:
+    score = {
+        "notes": [
+            {"key": None, "frame_length": 10, "lyric": ""},
+            {"key": 60, "frame_length": 20, "lyric": "あ"},
+            {"key": None, "frame_length": 5, "lyric": ""},
+        ]
+    }
+
+    res = client.post("/sing_frame_audio_query", params={"speaker": 0}, json=score)
+
+    assert res.status_code == 200, res.text
+    phonemes = res.json()["phonemes"]
+    assert [phoneme["phoneme"] for phoneme in phonemes] == ["pau", "a", "pau"]
+
+
 def test_sing_frame_audio_query_unknown_speaker_404(client: TestClient) -> None:
     res = client.post(
         "/sing_frame_audio_query",
@@ -131,6 +171,17 @@ def test_sing_frame_audio_query_unknown_speaker_404(client: TestClient) -> None:
         json={"notes": []},
     )
     assert res.status_code == 404
+
+
+def test_sing_frame_audio_query_accepts_voicevox_song_style_id_alias(
+    client: TestClient,
+) -> None:
+    score = {"notes": [{"key": 60, "frame_length": 20, "lyric": "あ"}]}
+
+    res = client.post("/sing_frame_audio_query", params={"speaker": 6000}, json=score)
+
+    assert res.status_code == 200, res.text
+    assert isinstance(res.json()["phonemes"], list)
 
 
 def test_sing_frame_f0_and_volume(client: TestClient) -> None:
@@ -204,6 +255,41 @@ def test_frame_synthesis_returns_wav(monkeypatch, client: TestClient) -> None:
         "outputStereo": False,
     }
     res = client.post("/frame_synthesis", params={"speaker": 0}, json=query)
+    assert res.status_code == 200, res.text
+    assert res.headers["content-type"].startswith("audio/wav")
+    assert res.content[:4] == b"RIFF"
+
+
+def test_frame_synthesis_accepts_voicevox_pau(monkeypatch, client: TestClient) -> None:
+    from diffsinger_engine.inference import diffsinger_runner, vocoder
+    from diffsinger_engine.routers import sing as sing_router
+
+    monkeypatch.setattr(diffsinger_runner, "AcousticModel", _FakeAcoustic)
+    monkeypatch.setattr(vocoder, "Vocoder", _FakeVocoder)
+    monkeypatch.setattr(
+        sing_router,
+        "to_wav_bytes",
+        lambda _waveform, src_sr, target_sr: b"RIFF" + b"\x00" * 4 + b"WAVE",
+    )
+
+    client.app.state.acoustic_cache = {}
+    client.app.state.vocoder_cache = {}
+
+    query = {
+        "f0": [220.0] * 16,
+        "volume": [1.0] * 16,
+        "phonemes": [
+            {"phoneme": "pau", "frame_length": 4},
+            {"phoneme": "a", "frame_length": 8},
+            {"phoneme": "pau", "frame_length": 4},
+        ],
+        "volumeScale": 1.0,
+        "outputSamplingRate": 44100,
+        "outputStereo": False,
+    }
+
+    res = client.post("/frame_synthesis", params={"speaker": 0}, json=query)
+
     assert res.status_code == 200, res.text
     assert res.headers["content-type"].startswith("audio/wav")
     assert res.content[:4] == b"RIFF"

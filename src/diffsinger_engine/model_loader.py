@@ -62,6 +62,12 @@ class LoadedSinger:
     portrait_path: Path | None = None
     character: dict[str, Any] = field(default_factory=dict)
     vocoder_config: dict[str, Any] = field(default_factory=dict)
+    pitch_root: Path | None = None
+    pitch_dsconfig: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def has_pitch_predictor(self) -> bool:
+        return self.pitch_root is not None and bool(self.pitch_dsconfig)
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:
@@ -215,6 +221,42 @@ def _resolve_vocoder(
     return None, {}
 
 
+def _resolve_relative_path(root: Path, value: object) -> Path | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    path = Path(value)
+    if not path.is_absolute():
+        path = root / path
+    return path
+
+
+def _load_pitch_bundle(folder: Path, dsconfig: dict[str, Any]) -> tuple[Path | None, dict[str, Any]]:
+    candidates: list[tuple[Path, dict[str, Any]]] = []
+
+    dspitch_config = folder / "dspitch" / "dsconfig.yaml"
+    if dspitch_config.is_file():
+        try:
+            candidates.append((folder / "dspitch", _load_yaml(dspitch_config)))
+        except Exception as exc:
+            logger.warning("dspitch/dsconfig.yaml の読み込みに失敗。pitch 予測を無効化します: %s (%s)", folder, exc)
+
+    if dsconfig.get("pitch") and dsconfig.get("linguistic"):
+        candidates.append((folder, dsconfig))
+
+    for root, pitch_dsconfig in candidates:
+        pitch_path = _resolve_relative_path(root, pitch_dsconfig.get("pitch"))
+        linguistic_path = _resolve_relative_path(root, pitch_dsconfig.get("linguistic"))
+        phonemes_path = _resolve_relative_path(root, pitch_dsconfig.get("phonemes") or "phonemes.txt")
+        if pitch_path and pitch_path.is_file() and linguistic_path and linguistic_path.is_file() and phonemes_path and phonemes_path.is_file():
+            return root, pitch_dsconfig
+        logger.warning(
+            "pitch predictor の必須ファイルが不足しているため無効化します: %s",
+            root,
+        )
+
+    return None, {}
+
+
 def _try_load_singer(folder: Path, style_id: int, vocoder_cache_dir: Path) -> LoadedSinger | None:
     """1つのモデルフォルダを検査・ロード。失敗時は None を返す。"""
     if not folder.is_dir():
@@ -249,6 +291,8 @@ def _try_load_singer(folder: Path, style_id: int, vocoder_cache_dir: Path) -> Lo
             folder,
         )
         return None
+
+    pitch_root, pitch_dsconfig = _load_pitch_bundle(folder, dsconfig)
 
     character: dict[str, Any] = {}
     character_path = folder / "character.yaml"
@@ -285,6 +329,8 @@ def _try_load_singer(folder: Path, style_id: int, vocoder_cache_dir: Path) -> Lo
         portrait_path=portrait_path if portrait_path.is_file() else None,
         character=character,
         vocoder_config=vocoder_config,
+        pitch_root=pitch_root,
+        pitch_dsconfig=pitch_dsconfig,
     )
 
 

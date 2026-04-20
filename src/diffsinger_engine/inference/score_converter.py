@@ -34,6 +34,7 @@ class DSInput:
 
     ph_seq: list[str] = field(default_factory=list)
     ph_dur: list[float] = field(default_factory=list)  # 秒
+    ph_note_indexes: list[int] = field(default_factory=list)
     note_seq: list[str] = field(default_factory=list)  # "C4" / "rest"
     note_dur: list[float] = field(default_factory=list)  # 秒
     is_slur: list[int] = field(default_factory=list)
@@ -116,12 +117,13 @@ def score_to_ds_input(
         consonant_seconds: 子音音素 1個あたりの固定割り当て秒数。
     """
     out = DSInput()
-    for note in score.notes:
+    for note_index, note in enumerate(score.notes):
         phonemes, durations, note_name, note_seconds = _expand_note(
             note, frame_rate=frame_rate, consonant_seconds=consonant_seconds
         )
         out.ph_seq.extend(phonemes)
         out.ph_dur.extend(durations)
+        out.ph_note_indexes.extend([note_index] * len(phonemes))
         # note_seq / note_dur は音素ごとに繰り返し展開する (DiffSinger 標準形式)。
         for _ in phonemes:
             out.note_seq.append(note_name)

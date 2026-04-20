@@ -137,3 +137,29 @@ def test_initialize_speaker_roundtrip(monkeypatch, client: TestClient) -> None:
     res = client.get("/is_initialized_speaker", params={"speaker": 0})
     assert res.status_code == 200
     assert res.json() is True
+
+
+def test_initialize_speaker_accepts_voicevox_song_style_id_alias(
+    monkeypatch, client: TestClient
+) -> None:
+    from diffsinger_engine.routers import compat
+
+    called = []
+
+    def _fake_get_or_load_models(app, singer):  # type: ignore[no-untyped-def]
+        called.append((app, singer.style_id))
+        return object(), object()
+
+    monkeypatch.setattr(compat, "get_or_load_models", _fake_get_or_load_models)
+
+    res = client.get("/is_initialized_speaker", params={"speaker": 6000})
+    assert res.status_code == 200
+    assert res.json() is False
+
+    init = client.post("/initialize_speaker", params={"speaker": 6000})
+    assert init.status_code == 204
+    assert called == [(client.app, 0)]
+
+    res = client.get("/is_initialized_speaker", params={"speaker": 6000})
+    assert res.status_code == 200
+    assert res.json() is True

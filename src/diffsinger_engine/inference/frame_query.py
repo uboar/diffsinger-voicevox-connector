@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import logging
 
+import numpy as np
+
 from diffsinger_engine.schemas import FrameAudioQuery, FramePhoneme, Score
 
 from .score_converter import DSInput
@@ -26,13 +28,20 @@ def _seconds_to_frames(seconds: float, frame_rate: float = VOICEVOX_FRAME_RATE) 
     return max(int(round(seconds * frame_rate)), 0)
 
 
+def _to_voicevox_phoneme(phoneme: str) -> str:
+    """DiffSinger 内部音素を VOICEVOX 歌唱 API 互換の表現へ寄せる。"""
+    if phoneme == "rest":
+        return "pau"
+    return phoneme
+
+
 def _build_frame_phonemes(ds_input: DSInput) -> list[FramePhoneme]:
     """DSInput.ph_seq / ph_dur をフレーム数付き FramePhoneme 列に変換。"""
     out: list[FramePhoneme] = []
     for phoneme, dur_sec in zip(ds_input.ph_seq, ds_input.ph_dur, strict=True):
         out.append(
             FramePhoneme(
-                phoneme=phoneme,
+                phoneme=_to_voicevox_phoneme(phoneme),
                 frame_length=_seconds_to_frames(dur_sec),
             )
         )
@@ -80,7 +89,7 @@ def build_frame_query(
     if volume is None:
         volume = _rule_based_volume(score)
 
-    # phonemes フレーム合計と F0/volume 長さの整合性を取る (短い方に合わせる)。
+    # phonemes フレーム合計と F0/volume 長さの整合性を取り、必要なら時間軸を補間する。
     if len(f0) != total_frames or len(volume) != total_frames:
         logger.debug(
             "フレーム数不整合 (phonemes=%d, f0=%d, volume=%d) → 整列します",
@@ -88,8 +97,8 @@ def build_frame_query(
             len(f0),
             len(volume),
         )
-        f0 = _resize_to(f0, total_frames, fill=0.0)
-        volume = _resize_to(volume, total_frames, fill=0.0)
+        f0 = _resample_to(f0, total_frames, fill=0.0)
+        volume = _resample_to(volume, total_frames, fill=0.0)
 
     return FrameAudioQuery(
         f0=f0,
@@ -99,12 +108,19 @@ def build_frame_query(
     )
 
 
-def _resize_to(seq: list[float], length: int, fill: float) -> list[float]:
+def _resample_to(seq: list[float], length: int, fill: float) -> list[float]:
+    if length <= 0:
+        return []
+    if not seq:
+        return [fill] * length
     if len(seq) == length:
-        return seq
-    if len(seq) > length:
-        return seq[:length]
-    return list(seq) + [fill] * (length - len(seq))
+        return list(seq)
+    if len(seq) == 1:
+        return [float(seq[0])] * length
+
+    source = np.asarray(seq, dtype=np.float32)
+    positions = np.linspace(0, len(source) - 1, num=length)
+    return np.interp(positions, np.arange(len(source)), source).astype(np.float32).tolist()
 
 
 # 公開: 他モジュールから使えるユーティリティ

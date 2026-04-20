@@ -10,7 +10,7 @@ from fastapi import APIRouter, Body, HTTPException, Query, Request, Response, st
 from ..inference.frame_query import VOICEVOX_FRAME_RATE, build_frame_query
 from ..inference.postprocess import to_wav_bytes
 from ..inference.score_converter import score_to_ds_input
-from ..runtime_state import get_or_load_models, get_singer
+from ..runtime_state import get_or_load_models, get_or_load_pitch_predictor, get_singer
 from ..schemas import FrameAudioQuery, Score
 
 logger = logging.getLogger(__name__)
@@ -31,12 +31,22 @@ _SCORE_AND_QUERY_BODY = Body(
 )
 
 
-def _build_query_for_singer(request: Request, score: Score) -> FrameAudioQuery:
+def _build_query_for_singer(request: Request, singer, score: Score) -> FrameAudioQuery:  # type: ignore[no-untyped-def]
     settings = request.app.state.settings
     ds_input = score_to_ds_input(score, frame_rate=VOICEVOX_FRAME_RATE)
+    predicted_f0: list[float] | None = None
+
+    predictor = get_or_load_pitch_predictor(request.app, singer)
+    if predictor is not None:
+        try:
+            predicted_f0 = predictor.predict_f0(score, ds_input)
+        except Exception:
+            logger.exception("pitch predictor の推論に失敗したため規則ベース F0 にフォールバックします")
+
     return build_frame_query(
         score=score,
         ds_input=ds_input,
+        f0=predicted_f0,
         output_sr=int(settings.final_sampling_rate),
     )
 
@@ -49,8 +59,8 @@ def sing_frame_audio_query(
     score: Score = _SCORE_BODY,
     speaker: int = Query(..., description="GET /singers の style id"),
 ) -> FrameAudioQuery:
-    get_singer(request, speaker)  # 存在検証
-    return _build_query_for_singer(request, score)
+    singer = get_singer(request, speaker)
+    return _build_query_for_singer(request, singer, score)
 
 
 # ──────────────────────── /sing_frame_f0 ────────────────────────
@@ -65,9 +75,9 @@ def sing_frame_f0(
     payload: dict = _SCORE_AND_QUERY_BODY,
     speaker: int = Query(...),
 ) -> list[float]:
-    get_singer(request, speaker)
+    singer = get_singer(request, speaker)
     score = Score.model_validate(payload["score"])
-    return _build_query_for_singer(request, score).f0
+    return _build_query_for_singer(request, singer, score).f0
 
 
 # ──────────────────────── /sing_frame_volume ────────────────────────
@@ -78,9 +88,9 @@ def sing_frame_volume(
     payload: dict = _SCORE_AND_QUERY_BODY,
     speaker: int = Query(...),
 ) -> list[float]:
-    get_singer(request, speaker)
+    singer = get_singer(request, speaker)
     score = Score.model_validate(payload["score"])
-    return _build_query_for_singer(request, score).volume
+    return _build_query_for_singer(request, singer, score).volume
 
 
 # ──────────────────────── /frame_synthesis ────────────────────────

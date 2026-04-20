@@ -16,6 +16,7 @@ def _make_singer_dir(
     name: str,
     *,
     with_character: bool = False,
+    with_pitch: bool = False,
     missing: tuple[str, ...] = (),
     vocoder: str = "vocoder.onnx",
 ) -> Path:
@@ -37,6 +38,19 @@ def _make_singer_dir(
     if with_character:
         (folder / "character.yaml").write_text(
             "name: テスト歌手\nuuid: 11111111-2222-3333-4444-555555555555\n",
+            encoding="utf-8",
+        )
+    if with_pitch:
+        pitch_dir = folder / "dspitch"
+        pitch_dir.mkdir()
+        (folder / "linguistic.onnx").write_bytes(b"fake-linguistic")
+        (pitch_dir / "pitch.onnx").write_bytes(b"fake-pitch")
+        (pitch_dir / "dsconfig.yaml").write_text(
+            "linguistic: ../linguistic.onnx\npitch: pitch.onnx\nphonemes: ../phonemes.txt\nsample_rate: 44100\nhop_size: 512\n",
+            encoding="utf-8",
+        )
+        (pitch_dir / "dsdict.yaml").write_text(
+            "symbols:\n  - symbol: a\n    type: vowel\n",
             encoding="utf-8",
         )
     return folder
@@ -128,6 +142,16 @@ def test_load_singers_resolves_shared_vocoder_dir(tmp_path: Path) -> None:
     [singer] = model_loader.load_singers(tmp_path)
     assert singer.vocoder_path == shared / "nsf_hifigan.onnx"
     assert singer.vocoder_config["sample_rate"] == 44100
+
+
+def test_load_singers_detects_pitch_bundle(tmp_path: Path) -> None:
+    _make_singer_dir(tmp_path, "alpha", with_pitch=True)
+
+    [singer] = model_loader.load_singers(tmp_path)
+
+    assert singer.has_pitch_predictor
+    assert singer.pitch_root == tmp_path / "alpha" / "dspitch"
+    assert singer.pitch_dsconfig["pitch"] == "pitch.onnx"
 
 
 def test_load_singers_extracts_vocoder_from_oudep(tmp_path: Path) -> None:
